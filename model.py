@@ -82,9 +82,12 @@ class Seq2SeqTransformer(nn.Module):
                                 src_padding_mask, tgt_padding_mask, memory_key_padding_mask)
         return self.generator(outs)
 
-    def encode(self, src: Tensor, src_mask: Tensor):
-        return self.transformer.encoder(self.positional_encoding(
-                            self.src_tok_emb(src)), src_mask)
+    def encode(self, src: Tensor, src_mask: Tensor, cl: Tensor):
+        src_emb = self.positional_encoding(self.src_tok_emb(src))
+        cls_emb = self.cls_lin(cl).unsqueeze(0)
+        print(src_emb.shape, cls_emb.shape)
+        tgt_emb = torch.cat((cls_emb, src_emb), 0)
+        return self.transformer.encoder(tgt_emb, src_mask)
 
     def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
         return self.transformer.decoder(self.positional_encoding(

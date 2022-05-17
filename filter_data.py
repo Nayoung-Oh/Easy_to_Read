@@ -96,26 +96,42 @@ def make_features(src, dest):
 
       return [dotRatio, restRatio, stopRatio, lenRatio, easyRatio]
 
-with open("./wikismall/filtered_data.csv", "w", encoding = 'utf-8', newline='') as writecsv:
-    with open("./wikismall/PWKP_108016.tag.new.aner.train.src", encoding = 'utf-8') as oris:
-        with open("./wikismall/PWKP_108016.tag.new.aner.train.dst", encoding = 'utf-8') as orid:
-            stopwords = stopwords.words('english')
-            wordnet_lemmatizer = WordNetLemmatizer()
-            word_path = './unigram_freq.csv'
-            word_data = csv.reader(open(word_path, 'r'))
-            word_freq = []
-            writer = csv.writer(writecsv)
-            with open(word_path) as word_file:
-                reader = csv.reader(word_file)
-                for row in reader:
-                    word_freq.append(row[0])
-            for s, d in zip(oris, orid):
-                feat = make_features(s, d)
-                feat.append(s)
-                feat.append(d)
-                writer.writerow(feat)
+# with open("./wikilarge/filtered_data.csv", "w", encoding = 'utf-8', newline='') as writecsv:
+#     with open("./wikilarge/wiki.full.aner.train.src", encoding = 'utf-8') as oris:
+#         with open("./wikilarge/wiki.full.aner.train.dst", encoding = 'utf-8') as orid:
+#             stopwords = stopwords.words('english')
+#             wordnet_lemmatizer = WordNetLemmatizer()
+#             word_path = './unigram_freq.csv'
+#             word_data = csv.reader(open(word_path, 'r'))
+#             word_freq = []
+#             writer = csv.writer(writecsv)
+#             with open(word_path) as word_file:
+#               reader = csv.reader(word_file)
+#               for row in reader:
+#                   word_freq.append(row[0])
+#             for s, d in zip(oris, orid):
+#               feat = make_features(s, d)
+#               feat.append(s.rstrip())
+#               feat.append(d.rstrip())
+#               writer.writerow(feat)
 
-# with open("./wikismall/filtered_data_val.csv", encoding = 'utf-8') as word_file:
+# with open("./wikismall/filtered_data_val_new.csv", encoding = 'utf-8') as word_file:
 #     reader = csv.reader(word_file)
-#     print(sum(1 for row in reader))
+#     for l in reader:
+#       print(l[-1])
+#       break
+    # print(sum(1 for row in reader))
 
+# with open("./wikismall/filtered_data_new.csv", "w", encoding = 'utf-8', newline='') as writecsv:
+#   with open("./wikismall/filtered_data.csv", "r", encoding = 'utf-8', newline='') as readcsv:
+#     writer = csv.writer(writecsv)
+#     reader = csv.reader(readcsv)
+#     for l in reader:
+#       tmp = l[:-2]
+#       tmp.append(l[-2].rstrip())
+#       tmp.append(l[-1].rstrip())
+      # writer.writerow(tmp)
+
+# import torch
+
+print(torch.cuda.memory_summary())
