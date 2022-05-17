@@ -85,7 +85,7 @@ class Seq2SeqTransformer(nn.Module):
     def encode(self, src: Tensor, src_mask: Tensor, cl: Tensor):
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         cls_emb = self.cls_lin(cl).unsqueeze(0)
-        print(src_emb.shape, cls_emb.shape)
+        # print(src_emb.shape, cls_emb.shape)
         tgt_emb = torch.cat((cls_emb, src_emb), 0)
         return self.transformer.encoder(tgt_emb, src_mask)
 

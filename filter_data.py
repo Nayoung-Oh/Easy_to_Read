@@ -96,9 +96,9 @@ def make_features(src, dest):
 
       return [dotRatio, restRatio, stopRatio, lenRatio, easyRatio]
 
-# with open("./wikilarge/filtered_data.csv", "w", encoding = 'utf-8', newline='') as writecsv:
-#     with open("./wikilarge/wiki.full.aner.train.src", encoding = 'utf-8') as oris:
-#         with open("./wikilarge/wiki.full.aner.train.dst", encoding = 'utf-8') as orid:
+# with open("./wikilarge/filtered_data_test.csv", "w", encoding = 'utf-8', newline='') as writecsv:
+#     with open("./wikilarge/wiki.full.aner.test.src", encoding = 'utf-8') as oris:
+#         with open("./wikilarge/wiki.full.aner.test.dst", encoding = 'utf-8') as orid:
 #             stopwords = stopwords.words('english')
 #             wordnet_lemmatizer = WordNetLemmatizer()
 #             word_path = './unigram_freq.csv'
@@ -134,4 +134,23 @@ def make_features(src, dest):
 
 # import torch
 
-print(torch.cuda.memory_summary())
+# print(torch.cuda.memory_summary())
+
+with open("./wikismall/PWKP_108016.tag.80.aner.ori.test.src", "r", encoding = 'utf-8') as oris:
+    with open("./wikismall/PWKP_108016.tag.80.aner.test.src", encoding = 'utf-8') as convs:
+        with open("./wikismall/report.txt", encoding = 'utf-8') as rep:
+          with open("./wikismall/report_new.txt", "w", encoding = 'utf-8') as finrep:
+            oris = oris.readlines()
+            convs = convs.readlines()
+            rep = rep.readlines()
+            for (o, c, r) in zip(oris, convs, rep):
+              olines = o.split()
+              clines = c.split()
+              info = {}
+              for (ol, cl) in zip(olines, clines):
+                if '@' in cl:
+                  info[cl] = ol
+              for (c, o) in info.items():
+                r = r.replace(c, o)
+              r = r.replace('@', '')
+              finrep.write(r)

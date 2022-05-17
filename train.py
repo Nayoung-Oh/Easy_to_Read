@@ -38,7 +38,7 @@ file_paths = ["./wikilarge/wiki.full.aner.train.src", "./wikilarge/wiki.full.ane
 # file_paths = ["./wikismall/PWKP_108016.tag.new.aner.train.src", "./wikismall/PWKP_108016.tag.new.aner.train.dst"]
 for f in file_paths:
   vocab_transform.append(build_vocab_from_iterator(yield_tokens_from_file(f),
-                                                min_freq=1,
+                                                min_freq=3,
                                                 specials=special_symbols,
                                                 special_first=True))
 
@@ -51,10 +51,12 @@ torch.manual_seed(0)
 
 SRC_VOCAB_SIZE = len(vocab_transform[0])
 TGT_VOCAB_SIZE = len(vocab_transform[1])
+print(SRC_VOCAB_SIZE, TGT_VOCAB_SIZE)
+# exit()
 EMB_SIZE = 512
 NHEAD = 8
 FFN_HID_DIM = 512
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 NUM_ENCODER_LAYERS = 3
 NUM_DECODER_LAYERS = 3
 
@@ -125,7 +127,7 @@ def create_mask(src, tgt):
     tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
     return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
 
-# sumwriter = SummaryWriter("./logs")
+sumwriter = SummaryWriter("./logs/freq3")
 
 def train_epoch(model, optimizer, epoch):
     model.train()
@@ -158,12 +160,12 @@ def train_epoch(model, optimizer, epoch):
         loss.backward()
 
         optimizer.step()
-        # if i % 500 == 0 or i == (max_len - 1):
-        #   end_time = timer()
-        #   print(i, '/', max_len, end_time - start_time)
-        #   start_time = timer()
-        #   tmp = loss.item()
-        #   sumwriter.add_scalar('training_loss', tmp / BATCH_SIZE, epoch*max_len + i)
+        if i % 200 == 0 or i == (max_len - 1):
+          end_time = timer()
+          print(i, '/', max_len, end_time - start_time)
+          start_time = timer()
+          tmp = loss.item()
+          sumwriter.add_scalar('training_loss', tmp, (epoch-1)*max_len + i)
         
         losses += loss.item()
         del logits, tgt, tgt_out, loss
@@ -180,13 +182,13 @@ def evaluate(model, epoch):
     val_iter =  WikiDataset("./wikilarge/filtered_data_val.csv")
     val_dataloader = DataLoader(val_iter, batch_size=BATCH_SIZE, collate_fn=collate_fn)
     max_len = len(val_dataloader)
-    # start_time = timer()
+    start_time = timer()
     with torch.no_grad():
         for i, (cl, src, tgt) in enumerate(val_dataloader):
-            # if i % 100 == 0:
-            #     end_time = timer()
-            #     print(i, '/', max_len, end_time - start_time)
-            #     start_time = timer()
+            if i % 100 == 0:
+                end_time = timer()
+                print(i, '/', max_len, end_time - start_time)
+                start_time = timer()
             cl = cl.to(DEVICE)
             src = src.to(DEVICE)
             tgt = tgt.to(DEVICE)
@@ -201,7 +203,7 @@ def evaluate(model, epoch):
             loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
             losses += loss.item()
     
-    # sumwriter.add_scalar('validation_loss', losses/max_len, epoch * max_len)
+    sumwriter.add_scalar('validation_loss', losses/max_len, epoch * max_len)
     return losses / max_len
 
 # function to generate output sequence using greedy algorithm 
@@ -230,7 +232,7 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol, cl):
 
 
 # actual function to translate input sentence into target language
-def translate(model: torch.nn.Module, src_sentence: str, cl: Tensor):
+def simplify(model: torch.nn.Module, src_sentence: str, cl: Tensor):
     model.eval()
     src = text_transform[0](src_sentence).view(-1, 1)
     num_tokens = src.shape[0]
@@ -239,27 +241,43 @@ def translate(model: torch.nn.Module, src_sentence: str, cl: Tensor):
         model,  src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX, cl=cl).flatten()
     return " ".join(vocab_transform[1].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
 
-NUM_EPOCHS = 6
+# NUM_EPOCHS = 3
 # transformer.load_state_dict(torch.load(""))
 # val loss 3.95
-min_val_loss = 10
-with open("large_training_res.csv", "w", newline="") as f:
-    writer = csv.writer(f)
-    for epoch in range(1, NUM_EPOCHS+1):
-        start_time = timer()
-        train_loss = train_epoch(transformer, optimizer, epoch)
-        end_time = timer()
-        val_loss = evaluate(transformer, epoch)
-        print((f"Epoch: {epoch + 1}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
-        writer.writerow([epoch, train_loss, val_loss])
-        if epoch % 10 == 0 or (epoch > 10 and val_loss < min_val_loss):
-            print("save model")
-            torch.save(transformer.state_dict(), f"large_{epoch}_val_{val_loss:.3f}")
-        min_val_loss = min(val_loss, min_val_loss)
+# min_val_loss = 10
+# with open("large_training_res.csv", "w", newline="") as f:
+#     writer = csv.writer(f)
+#     for epoch in range(1, NUM_EPOCHS+1):
+#         start_time = timer()
+#         train_loss = train_epoch(transformer, optimizer, epoch)
+#         end_time = timer()
+#         val_loss = evaluate(transformer, epoch)
+#         print((f"Epoch: {epoch + 1}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
+#         writer.writerow([epoch, train_loss, val_loss])
+#         if epoch % 1 == 0 or (epoch > 10 and val_loss < min_val_loss):
+#             print("save model")
+#             torch.save(transformer.state_dict(), f"large_{epoch}_val_{val_loss:.3f}")
+#         min_val_loss = min(val_loss, min_val_loss)
 
 # transformer.load_state_dict(torch.load("layer3_ 20_val_3.336"))
-# print(translate(transformer, "Charity Rice is known for his charity work .", torch.tensor([[1.0,1.0,0.9411764705882353,1.0,1.2777777777777777]])))
+# print(simplify(transformer, "Charity Rice is known for his charity work .", torch.tensor([[1.0,1.0,0.9411764705882353,1.0,1.2777777777777777]])))
+
 # He is known for his band for his father , for his name for his
 # He is known for his own music music music for his own music music music
 # Rice is also known for his charity work
 # tgt: Rice is also known for his charity work . 
+
+# transformer.load_state_dict(torch.load("layer3_ 20_val_3.336"))
+
+transformer.load_state_dict(torch.load("large_3_val_2.338"))
+print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[0, 0, 0, 0, 0]], dtype=torch.float)))
+print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0]], dtype=torch.float)))
+print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0,1.0,0.9333333333333333,0.8888888888888888,1.0574712643678161]], dtype=torch.float)))
+
+# The incident has been the subject of numerous reports regarding scholarship ethics .
+
+# with open("./wikismall/filtered_data_test.csv", encoding = 'utf-8') as f:
+#     with open("./wikismall/report.txt", "w", encoding='utf-8') as res:
+#         reader = csv.reader(f)
+#         for l in reader:
+#             res.write(simplify(transformer, l[-2], torch.tensor([[float(i) for i in l[:-2]]])) + '\n')
