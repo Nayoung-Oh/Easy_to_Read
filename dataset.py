@@ -29,4 +29,4 @@ class WikiDataset(Dataset):
     def __del__(self):
         return self.f.close() 
     def __getitem__(self, idx):
-        return ([float(i) for i in self.data[idx][:-2]], self.data[idx][-2], self.data[idx][-1])
+        return ([float(i) for i in self.data[idx][0:5]], [float(i) for i in self.data[idx][5:10]], self.data[idx][-2], self.data[idx][-1])

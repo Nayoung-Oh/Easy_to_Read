@@ -38,9 +38,9 @@ wordnet_lemmatizer = WordNetLemmatizer()
 stopwords = stopwords.words('english')
 # all_words[word] = 0(not in wordfreq) or 1(in wordfreq)
 
-dest_file = "./wikilarge/wiki.full.aner.test.dst"
-src_file = "./wikilarge/wiki.full.aner.test.src"
-write_to = "./wikilarge/new_data_test.csv"
+dest_file = "./wikilarge/wiki.full.aner.train.dst"
+src_file = "./wikilarge/wiki.full.aner.train.src"
+write_to = "./wikilarge/new_data_train.csv"
 
 with open(dest_file, 'r', encoding = 'utf-8') as f1:
   train_dest = f1.readlines()

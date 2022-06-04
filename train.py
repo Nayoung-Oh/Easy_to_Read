@@ -12,6 +12,8 @@ from timeit import default_timer as timer
 from torch.nn.utils.rnn import pad_sequence
 import gc, csv
 from torch.utils.tensorboard import SummaryWriter
+from nltk.corpus import stopwords
+import numpy as np
 
 LANGUAGE = 'en'
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -47,6 +49,23 @@ for f in file_paths:
 for i in range(2):
   vocab_transform[i].set_default_index(UNK_IDX)
 
+stopwords = stopwords.words('english')
+stop_idx = [a for a in vocab_transform[1](stopwords) if a != 0]
+dot = ['.', '..', '...']
+dot_idx = [a for a in vocab_transform[1](dot) if a != 0]
+rest_idx = vocab_transform[1]([','])
+word_path =  "./unigram_freq.csv"
+with open(word_path, 'r') as f:
+  word_data = csv.reader(f)
+  word_freq = []
+  count = 0
+  for row in word_data:
+    word_freq.append(row[0])
+    count += 1
+    if count > 10000:
+      break
+easy_idx = [a for a in vocab_transform[1](word_freq) if a != 0]
+
 torch.manual_seed(0)
 
 SRC_VOCAB_SIZE = len(vocab_transform[0])
@@ -69,7 +88,7 @@ for p in transformer.parameters():
 
 transformer = transformer.to(DEVICE)
 
-loss_fn = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX)
+loss_fn = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX, reduction='none')
 
 optimizer = torch.optim.Adam(transformer.parameters(), lr=0.0002, betas=(0.9, 0.98), eps=1e-9)
 
@@ -98,15 +117,17 @@ for ln in range(2):
 
 # function to collate data samples into batch tesors
 def collate_fn(batch):
-    cls_batch, src_batch, tgt_batch = [], [], []
-    for cls_sample, src_sample, tgt_sample in batch:
+    info_batch, cls_batch, src_batch, tgt_batch = [], [], [], []
+    for info_sample, cls_sample, src_sample, tgt_sample in batch:
+        info_batch.append(torch.tensor(info_sample))
         cls_batch.append(torch.tensor(cls_sample))
         src_batch.append(text_transform[0](src_sample.rstrip("\n")))
         tgt_batch.append(text_transform[1](tgt_sample.rstrip("\n")))
+    info_batch = torch.stack(info_batch)
     cls_batch = torch.stack(cls_batch)
     src_batch = pad_sequence(src_batch, padding_value=PAD_IDX)
     tgt_batch = pad_sequence(tgt_batch, padding_value=PAD_IDX)
-    return cls_batch, src_batch, tgt_batch
+    return info_batch, cls_batch, src_batch, tgt_batch
 
 def generate_square_subsequent_mask(sz):
     mask = (torch.triu(torch.ones((sz, sz), device=DEVICE)) == 1).transpose(0, 1)
@@ -127,17 +148,48 @@ def create_mask(src, tgt):
     tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
     return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
 
-sumwriter = SummaryWriter("./logs/freq3")
+sumwriter = SummaryWriter("./logs/feature")
+
+def feature_cal(tmp, info, cl):
+  _, next_word = torch.max(tmp, dim=2)
+  next_word = next_word.cpu().transpose(1, 0)
+  twos = np.ones((next_word.shape[0], 1)) * EOS_IDX
+  new = np.append(next_word, twos, axis=1)
+  length = []
+
+  for i in range(next_word.shape[0]):
+    l = np.where(new[i, :] == EOS_IDX)
+    length.append(l[0][0] + 1)
+  length = np.array(length).reshape(-1)
+  
+  # info # batch X 5
+  
+  dot_count = np.isin(next_word, dot_idx).sum(axis=1)
+  rest_count = np.isin(next_word, rest_idx).sum(axis=1) + 1
+  stop_count = np.isin(next_word, stop_idx).sum(axis=1) + 1
+  easy_count = np.isin(next_word, easy_idx).sum(axis=1) 
+  easy_ratio = easy_count / length + 0.1
+
+  for val in range(1, 4):
+    info[:, val] += 1
+  info[:, 4] += 0.1
+
+  dest = np.stack([dot_count, rest_count, stop_count, length, easy_ratio]).transpose(1, 0)
+  feature = dest / info
+  feature[:, 3] = 1 / feature[:, 3]
+  weight = ((feature - cl)**2)
+  weight = weight.mean(axis=1)
+  return weight
 
 def train_epoch(model, optimizer, epoch):
     model.train()
     losses = 0
-    train_iter = WikiDataset("./wikilarge/filtered_data.csv")
+    train_iter = WikiDataset("./wikilarge/new_data.csv")
     train_dataloader = DataLoader(train_iter, batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn, pin_memory=True)
     max_len = len(train_dataloader)
     start_time = timer()
 
-    for i, (cl, src, tgt) in enumerate(train_dataloader):
+    for i, (info, cl, src, tgt) in enumerate(train_dataloader):
         
         cl = cl.to(DEVICE)
         src = src.to(DEVICE)
@@ -151,14 +203,24 @@ def train_epoch(model, optimizer, epoch):
 
         optimizer.zero_grad()
 
-        del src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, cl
+        del src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
         gc.collect()
         torch.cuda.empty_cache()
 
         tgt_out = tgt[1:, :]
+        tmp = logits.clone()
+        b_size = logits.shape[1]
         loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
-        loss.backward()
+        loss = loss.reshape(-1, b_size).mean(axis=0)
 
+        info = info.cpu().numpy()
+        cl = cl.cpu().numpy()
+        weight = feature_cal(tmp, info, cl)
+        weight = torch.Tensor(weight).to(DEVICE)
+        
+        weighted_loss = (weight * loss).mean()
+        weighted_loss.backward()
+        
         optimizer.step()
         if i % 200 == 0 or i == (max_len - 1):
           end_time = timer()
@@ -168,7 +230,7 @@ def train_epoch(model, optimizer, epoch):
           sumwriter.add_scalar('training_loss', tmp, (epoch-1)*max_len + i)
         
         losses += loss.item()
-        del logits, tgt, tgt_out, loss
+        del logits, tgt, tgt_out, loss, cl
         gc.collect()
         torch.cuda.empty_cache()
     
@@ -179,12 +241,12 @@ def train_epoch(model, optimizer, epoch):
 def evaluate(model, epoch):
     model.eval()
     losses = 0
-    val_iter =  WikiDataset("./wikilarge/filtered_data_val.csv")
+    val_iter =  WikiDataset("./wikilarge/new_data_valid.csv")
     val_dataloader = DataLoader(val_iter, batch_size=BATCH_SIZE, collate_fn=collate_fn)
     max_len = len(val_dataloader)
     start_time = timer()
     with torch.no_grad():
-        for i, (cl, src, tgt) in enumerate(val_dataloader):
+        for i, (info, cl, src, tgt) in enumerate(val_dataloader):
             if i % 100 == 0:
                 end_time = timer()
                 print(i, '/', max_len, end_time - start_time)
@@ -200,8 +262,18 @@ def evaluate(model, epoch):
             logits = model(src, tgt_input, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask, cl)
             
             tgt_out = tgt[1:, :]
+            tmp = logits.clone()
+            b_size = logits.shape[1]
             loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
-            losses += loss.item()
+            loss = loss.reshape(-1, b_size).mean(axis=0)
+
+            info = info.cpu().numpy()
+            cl = cl.cpu().numpy()
+            weight = feature_cal(tmp, info, cl)
+            weight = torch.Tensor(weight).to(DEVICE)
+            
+            weighted_loss = (weight * loss).mean()
+            losses += weighted_loss.item()
     
     sumwriter.add_scalar('validation_loss', losses/max_len, epoch * max_len)
     return losses / max_len
@@ -241,23 +313,23 @@ def simplify(model: torch.nn.Module, src_sentence: str, cl: Tensor):
         model,  src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX, cl=cl).flatten()
     return " ".join(vocab_transform[1].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
 
-# NUM_EPOCHS = 3
+NUM_EPOCHS = 3
 # transformer.load_state_dict(torch.load(""))
 # val loss 3.95
-# min_val_loss = 10
-# with open("large_training_res.csv", "w", newline="") as f:
-#     writer = csv.writer(f)
-#     for epoch in range(1, NUM_EPOCHS+1):
-#         start_time = timer()
-#         train_loss = train_epoch(transformer, optimizer, epoch)
-#         end_time = timer()
-#         val_loss = evaluate(transformer, epoch)
-#         print((f"Epoch: {epoch + 1}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
-#         writer.writerow([epoch, train_loss, val_loss])
-#         if epoch % 1 == 0 or (epoch > 10 and val_loss < min_val_loss):
-#             print("save model")
-#             torch.save(transformer.state_dict(), f"large_{epoch}_val_{val_loss:.3f}")
-#         min_val_loss = min(val_loss, min_val_loss)
+min_val_loss = 10
+with open("new_training.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    for epoch in range(1, NUM_EPOCHS+1):
+        start_time = timer()
+        train_loss = train_epoch(transformer, optimizer, epoch)
+        end_time = timer()
+        val_loss = evaluate(transformer, epoch)
+        print((f"Epoch: {epoch + 1}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
+        writer.writerow([epoch, train_loss, val_loss])
+        if epoch % 1 == 0 or (epoch > 10 and val_loss < min_val_loss):
+            print("save model")
+            torch.save(transformer.state_dict(), f"large_{epoch}_val_{val_loss:.3f}")
+        min_val_loss = min(val_loss, min_val_loss)
 
 # transformer.load_state_dict(torch.load("layer3_ 20_val_3.336"))
 # print(simplify(transformer, "Charity Rice is known for his charity work .", torch.tensor([[1.0,1.0,0.9411764705882353,1.0,1.2777777777777777]])))
@@ -269,14 +341,14 @@ def simplify(model: torch.nn.Module, src_sentence: str, cl: Tensor):
 
 # transformer.load_state_dict(torch.load("layer3_ 20_val_3.336"))
 
-transformer.load_state_dict(torch.load("large_3_val_2.338"))
-print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[0, 0, 0, 0, 0]], dtype=torch.float)))
-print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0]], dtype=torch.float)))
-print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0,1.0,0.9333333333333333,0.8888888888888888,1.0574712643678161]], dtype=torch.float)))
+# transformer.load_state_dict(torch.load("large_3_val_2.338"))
+# print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[0, 0, 0, 0, 0]], dtype=torch.float)))
+# print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0]], dtype=torch.float)))
+# print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0,1.0,0.9333333333333333,0.8888888888888888,1.0574712643678161]], dtype=torch.float)))
 
 # The incident has been the subject of numerous reports regarding scholarship ethics .
 
-# with open("./wikismall/filtered_data_test.csv", encoding = 'utf-8') as f:
+# with open("./wikismall/new_data_test.csv", encoding = 'utf-8') as f:
 #     with open("./wikismall/report.txt", "w", encoding='utf-8') as res:
 #         reader = csv.reader(f)
 #         for l in reader:
