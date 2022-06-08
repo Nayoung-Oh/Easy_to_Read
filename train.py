@@ -148,11 +148,11 @@ def create_mask(src, tgt):
     tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
     return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
 
-sumwriter = SummaryWriter("./logs/feature")
+# sumwriter = SummaryWriter("./logs/feature")
 
 def feature_cal(tmp, info, cl):
-  _, next_word = torch.max(tmp, dim=2)
-  next_word = next_word.cpu().transpose(1, 0)
+  next_word = np.max(tmp, axis=2)
+  next_word = next_word.transpose(1, 0)
   twos = np.ones((next_word.shape[0], 1)) * EOS_IDX
   new = np.append(next_word, twos, axis=1)
   length = []
@@ -179,12 +179,16 @@ def feature_cal(tmp, info, cl):
   feature[:, 3] = 1 / feature[:, 3]
   weight = ((feature - cl)**2)
   weight = weight.mean(axis=1)
-  return weight
+  scaled_weight = weight * 0.1 + 1.0
+#   print(weight)
+#   print(scaled_weight)
+  scaled_weight = np.clip(scaled_weight, 1.0, 2.5)
+  return scaled_weight
 
 def train_epoch(model, optimizer, epoch):
     model.train()
     losses = 0
-    train_iter = WikiDataset("./wikilarge/new_data.csv")
+    train_iter = WikiDataset("./wikilarge/new_data_train.csv")
     train_dataloader = DataLoader(train_iter, batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn, pin_memory=True)
     max_len = len(train_dataloader)
     start_time = timer()
@@ -208,7 +212,7 @@ def train_epoch(model, optimizer, epoch):
         torch.cuda.empty_cache()
 
         tgt_out = tgt[1:, :]
-        tmp = logits.clone()
+        tmp = logits.cpu().detach().numpy()
         b_size = logits.shape[1]
         loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
         loss = loss.reshape(-1, b_size).mean(axis=0)
@@ -217,7 +221,7 @@ def train_epoch(model, optimizer, epoch):
         cl = cl.cpu().numpy()
         weight = feature_cal(tmp, info, cl)
         weight = torch.Tensor(weight).to(DEVICE)
-        
+        # exit()
         weighted_loss = (weight * loss).mean()
         weighted_loss.backward()
         
@@ -226,11 +230,11 @@ def train_epoch(model, optimizer, epoch):
           end_time = timer()
           print(i, '/', max_len, end_time - start_time)
           start_time = timer()
-          tmp = loss.item()
+          tmp = weighted_loss.item()
           sumwriter.add_scalar('training_loss', tmp, (epoch-1)*max_len + i)
         
-        losses += loss.item()
-        del logits, tgt, tgt_out, loss, cl
+        losses += weighted_loss.item()
+        del logits, tgt, tgt_out, loss, cl, weight, weighted_loss
         gc.collect()
         torch.cuda.empty_cache()
     
@@ -262,7 +266,7 @@ def evaluate(model, epoch):
             logits = model(src, tgt_input, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask, cl)
             
             tgt_out = tgt[1:, :]
-            tmp = logits.clone()
+            tmp = logits.cpu().detach().numpy()
             b_size = logits.shape[1]
             loss = loss_fn(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
             loss = loss.reshape(-1, b_size).mean(axis=0)
@@ -313,23 +317,25 @@ def simplify(model: torch.nn.Module, src_sentence: str, cl: Tensor):
         model,  src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX, cl=cl).flatten()
     return " ".join(vocab_transform[1].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
 
-NUM_EPOCHS = 3
+# NUM_EPOCHS = 3
+# transformer.load_state_dict(torch.load("new_large_3_val_1.047"))
 # transformer.load_state_dict(torch.load(""))
 # val loss 3.95
-min_val_loss = 10
-with open("new_training.csv", "w", newline="") as f:
-    writer = csv.writer(f)
-    for epoch in range(1, NUM_EPOCHS+1):
-        start_time = timer()
-        train_loss = train_epoch(transformer, optimizer, epoch)
-        end_time = timer()
-        val_loss = evaluate(transformer, epoch)
-        print((f"Epoch: {epoch + 1}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
-        writer.writerow([epoch, train_loss, val_loss])
-        if epoch % 1 == 0 or (epoch > 10 and val_loss < min_val_loss):
-            print("save model")
-            torch.save(transformer.state_dict(), f"large_{epoch}_val_{val_loss:.3f}")
-        min_val_loss = min(val_loss, min_val_loss)
+# min_val_loss = 1.047
+# with open("new_training.csv", "a", newline="") as f:
+#     writer = csv.writer(f)
+#     for epoch in range(4, NUM_EPOCHS+4):
+#         start_time = timer()
+#         # train_loss = 0
+#         train_loss = train_epoch(transformer, optimizer, epoch)
+#         end_time = timer()
+#         val_loss = evaluate(transformer, epoch)
+#         print((f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
+#         writer.writerow([epoch, train_loss, val_loss])
+#         if epoch % 1 == 0 or (epoch > 10 and val_loss < min_val_loss):
+#             print("save model")
+#             torch.save(transformer.state_dict(), f"new_large_{epoch}_val_{val_loss:.3f}")
+#         min_val_loss = min(val_loss, min_val_loss)
 
 # transformer.load_state_dict(torch.load("layer3_ 20_val_3.336"))
 # print(simplify(transformer, "Charity Rice is known for his charity work .", torch.tensor([[1.0,1.0,0.9411764705882353,1.0,1.2777777777777777]])))
@@ -339,17 +345,20 @@ with open("new_training.csv", "w", newline="") as f:
 # Rice is also known for his charity work
 # tgt: Rice is also known for his charity work . 
 
-# transformer.load_state_dict(torch.load("layer3_ 20_val_3.336"))
+transformer.load_state_dict(torch.load("new_large_5_val_1.045"))
 
 # transformer.load_state_dict(torch.load("large_3_val_2.338"))
 # print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[0, 0, 0, 0, 0]], dtype=torch.float)))
 # print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0]], dtype=torch.float)))
-# print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0,1.0,0.9333333333333333,0.8888888888888888,1.0574712643678161]], dtype=torch.float)))
+print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,1.0,1.0]], dtype=torch.float)))
+print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,0.8,1.0]], dtype=torch.float)))
+print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,1.2,1.0]], dtype=torch.float)))
+
 
 # The incident has been the subject of numerous reports regarding scholarship ethics .
 
-# with open("./wikismall/new_data_test.csv", encoding = 'utf-8') as f:
-#     with open("./wikismall/report.txt", "w", encoding='utf-8') as res:
+# with open("./wikilarge/new_data_test.csv", encoding = 'utf-8') as f:
+#     with open("./wikilarge/new_report.txt", "w", encoding='utf-8') as res:
 #         reader = csv.reader(f)
 #         for l in reader:
-#             res.write(simplify(transformer, l[-2], torch.tensor([[float(i) for i in l[:-2]]])) + '\n')
+#             res.write(simplify(transformer, l[-2], torch.tensor([[float(i) for i in l[5:10]]])) + '\n')
