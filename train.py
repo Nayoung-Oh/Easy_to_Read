@@ -13,7 +13,11 @@ from torch.nn.utils.rnn import pad_sequence
 import gc, csv
 from torch.utils.tensorboard import SummaryWriter
 from nltk.corpus import stopwords
+import nltk
+from nltk.stem import WordNetLemmatizer
 import numpy as np
+from scipy import spatial
+
 
 LANGUAGE = 'en'
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -148,7 +152,7 @@ def create_mask(src, tgt):
     tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
     return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
 
-# sumwriter = SummaryWriter("./logs/feature")
+# sumwriter = SummaryWriter("./logs/feature_big")
 
 def feature_cal(tmp, info, cl):
   next_word = np.max(tmp, axis=2)
@@ -317,14 +321,14 @@ def simplify(model: torch.nn.Module, src_sentence: str, cl: Tensor):
         model,  src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX, cl=cl).flatten()
     return " ".join(vocab_transform[1].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
 
-# NUM_EPOCHS = 3
-# transformer.load_state_dict(torch.load("new_large_3_val_1.047"))
-# transformer.load_state_dict(torch.load(""))
-# val loss 3.95
-# min_val_loss = 1.047
-# with open("new_training.csv", "a", newline="") as f:
+NUM_EPOCHS = 3
+# transformer.load_state_dict(torch.load("new_big_1_val_1.699"))
+# # transformer.load_state_dict(torch.load(""))
+# # val loss 3.95
+# min_val_loss = 3
+# with open("new_training_big.csv", "a", newline="") as f:
 #     writer = csv.writer(f)
-#     for epoch in range(4, NUM_EPOCHS+4):
+#     for epoch in range(2, NUM_EPOCHS+1):
 #         start_time = timer()
 #         # train_loss = 0
 #         train_loss = train_epoch(transformer, optimizer, epoch)
@@ -334,7 +338,7 @@ def simplify(model: torch.nn.Module, src_sentence: str, cl: Tensor):
 #         writer.writerow([epoch, train_loss, val_loss])
 #         if epoch % 1 == 0 or (epoch > 10 and val_loss < min_val_loss):
 #             print("save model")
-#             torch.save(transformer.state_dict(), f"new_large_{epoch}_val_{val_loss:.3f}")
+#             torch.save(transformer.state_dict(), f"new_big_{epoch}_val_{val_loss:.3f}")
 #         min_val_loss = min(val_loss, min_val_loss)
 
 # transformer.load_state_dict(torch.load("layer3_ 20_val_3.336"))
@@ -350,9 +354,9 @@ transformer.load_state_dict(torch.load("new_large_5_val_1.045"))
 # transformer.load_state_dict(torch.load("large_3_val_2.338"))
 # print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[0, 0, 0, 0, 0]], dtype=torch.float)))
 # print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0]], dtype=torch.float)))
-print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,1.0,1.0]], dtype=torch.float)))
-print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,0.8,1.0]], dtype=torch.float)))
-print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,1.2,1.0]], dtype=torch.float)))
+# print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,1.0,1.0]], dtype=torch.float)))
+# print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,0.8,1.0]], dtype=torch.float)))
+# print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,1.2,1.0]], dtype=torch.float)))
 
 
 # The incident has been the subject of numerous reports regarding scholarship ethics .
@@ -362,3 +366,225 @@ print(simplify(transformer, "I really really love you more than anyone .", torch
 #         reader = csv.reader(f)
 #         for l in reader:
 #             res.write(simplify(transformer, l[-2], torch.tensor([[float(i) for i in l[5:10]]])) + '\n')
+
+# src_path = 'wikilarge/wiki.full.aner.test.src'
+# dest_path = 'wikilarge/wiki.full.aner.test.dst'
+
+
+
+# stopwords = nltk.corpus.stopwords.words('english')
+# wordnet_lemmatizer = WordNetLemmatizer()
+
+
+# word_path = './unigram_freq.csv'
+# word_data = csv.reader(open(word_path, 'r'))
+# word_freq = []
+# with open(word_path) as word_file:
+#   reader = csv.reader(word_file)
+#   for row in reader:
+#       word_freq.append(row[0])
+
+# with open(dest_path, 'r') as f1:
+#     test_dest = f1.readlines()
+# with open(src_path, 'r') as f2:
+#     test_src = f2.readlines()
+
+# def count_rest(list):
+#   count = 0
+#   for w in list:
+#     if w==',':
+#       count = count+1
+#   return count
+# def count_dot(list):
+#   count = 0
+#   for w in list:
+#     if w=='.':
+#       count = count+1
+#   if count==0:
+#     count = 1
+#   return count
+# def count_freqword(sent, num):
+#   res = 0
+#   for word in sent:
+#     if word in word_freq[1:int(num)]:
+#       res = res + 1
+#   return res
+# def count_stopword(sent):
+#   res = 0
+#   for word in sent:
+#     if word in stopwords:
+#       res = res+1
+#   return res
+# def preprocess_freqword(sent):
+#   for word in sent:
+#     all_words[word] = 0
+# def count_freqword(sent):
+#   res = 0
+#   for word in sent:
+#     if not all_words.get(word):
+#       continue
+#     if all_words[word] == 1:
+#       res = res + 1
+#   return res
+
+# temp_word_dest = [sent.strip('\n').split(' ') for sent in test_dest]
+# temp_word_src = [sent.strip('\n').split(' ') for sent in test_src]
+# prepro_dest = [[w.strip("."",") for w in sent] for sent in temp_word_dest]
+# prepro_src = [[w.strip("."",") for w in sent] for sent in temp_word_src]
+# prepro_dest = [[w for w in sent if w] for sent in prepro_dest]
+# prepro_src = [[w for w in sent if w] for sent in prepro_src]
+# prepro2_dest = [[w for w in sent if w not in stopwords] for sent in prepro_dest]
+# prepro2_dest = [[wordnet_lemmatizer.lemmatize(w) for w in sent] for sent in prepro2_dest]
+# prepro2_src = [[w for w in sent if w not in stopwords] for sent in prepro_src]
+# prepro2_src = [[wordnet_lemmatizer.lemmatize(w) for w in sent] for sent in prepro2_src]
+
+# all_words = {}
+# easyNum = 10000 # top 10000 words
+
+# for sent in prepro2_dest:
+#   preprocess_freqword(sent)
+# for sent in prepro2_src:
+#   preprocess_freqword(sent)
+# for word in word_freq[1:easyNum]:
+#   all_words[word] = 1
+
+# def make_features(src, dest):
+#   # remove '\n' and split by ' '
+#   temp_src = src.strip('\n').split(' ')
+#   temp_dest = dest.strip('\n').split(' ')
+
+#   # (1) count dot and (2) rest
+#   dotCount_src = 0;  dotCount_dest = 0
+#   restCount_src = 0;  restCount_dest = 0
+#   for w in src:
+#     if w in ['.', '..', '...']:
+#       dotCount_src = dotCount_src+1
+#     if w == ',':
+#       restCount_src = restCount_src+1
+#   for w in dest:
+#     if w in ['.', '..', '...']:
+#       dotCount_dest = dotCount_dest+1
+#     if w == ',':
+#       restCount_dest = restCount_dest+1
+#   if dotCount_src == 0:
+#     dotCount_src = 1
+#   if dotCount_dest == 0:
+#     dotCount_dest = 1
+
+#   # remove '.'
+#   temp_src = [w.strip("."",") for w in temp_src]
+#   temp_src = [w for w in temp_src if w]
+#   temp_dest = [w.strip("."",") for w in temp_dest]
+#   temp_dest = [w for w in temp_dest if w]
+
+#   # (3) count stopwords
+#   stopCount_src = 0;  stopCount_dest = 0
+#   for w in src:
+#     if w in stopwords:
+#       stopCount_src = stopCount_src+1
+#   for w in dest:
+#     if w in stopwords:
+#       stopCount_dest = stopCount_dest+1
+
+#   # remove stopwords and lemmatize
+#   temp_src = [w for w in temp_src if w not in stopwords]
+#   temp_dest = [w for w in temp_dest if w not in stopwords]
+#   temp_src = [wordnet_lemmatizer.lemmatize(w) for w in temp_src]
+#   temp_dest = [wordnet_lemmatizer.lemmatize(w) for w in temp_dest]
+
+#   # (4) len
+#   lenCount_src = len(temp_src)
+#   lenCount_dest = len(temp_dest)
+
+#   # (5) Count easywords
+#   easywordCount_src = count_freqword(temp_src)
+#   easywordCount_dest = count_freqword(temp_dest)
+#   easywordRatio_src = (easywordCount_src)/(lenCount_src+1)
+#   easywordRatio_dest = (easywordCount_dest)/(lenCount_dest+1)
+
+#   # make all ratio
+#   dotRatio = dotCount_dest/dotCount_src
+#   restRatio = (restCount_dest+1)/(restCount_src+1)
+#   stopRatio = (stopCount_dest+1)/(stopCount_src+1)
+#   lenRatio = (lenCount_src+1)/(lenCount_dest+1)
+#   easyRatio = (easywordRatio_dest+0.1)/(easywordRatio_src+0.1)
+
+#   return [dotRatio, restRatio, stopRatio, lenRatio, easyRatio]
+
+# # increment index score by inc
+# def change_scores(scores, index, inc):
+#   scores[index] = scores[index] + inc
+#   return scores
+# # compute difference b/w output and input (nonuse)
+# def designated_change(index, input_feature, output_feature):
+#   return output_feature[index]-input_feature[index]
+# # compute other scores diff (nonuse)
+# def other_change(index, input_feature, output_feature):
+#   distance = []
+#   for i in range(5):
+#     if i==index:
+#       distance.append(0.0)
+#       continue
+#     distance.append((input_feature[i]-output_feature[i])**2)
+#   return distance
+
+# # return 2 scores
+# def total_output(src, dest, index, delta):
+#   original_features = make_features(src, dest)
+#   designated_features = change_scores(original_features.copy(), index, delta)
+#   new_dest = simplify(transformer, src, torch.tensor([designated_features], dtype=torch.float))
+#   output_features = make_features(src, new_dest)
+#   #final_designated = designated_change(feature_index, designated_features, output_features)
+#   #final_others = math.sqrt(sum(other_change(feature_index, designated_features, output_features)))
+#   #return final_designated, final_others
+#   return designated_features, output_features
+
+# def sim(List1, List2):
+#     result = 1 - spatial.distance.cosine(List1, List2)
+#     return result
+
+# total_len = len(test_src)
+
+# f0_designates = []
+# f0_outputs = []
+# for i in range(total_len):
+#   #if i%100==0:
+#   #  print(i)
+#   f0_designate, f0_output = total_output(test_src[i],test_dest[i],0,1.0)
+#   f0_designates.append(f0_designate)
+#   f0_outputs.append(f0_output)
+
+# f1_designates = []
+# f1_outputs = []
+# for i in range(total_len):
+#   f1_designate, f1_output = total_output(test_src[i],test_dest[i],1,1.0)
+#   f1_designates.append(f1_designate)
+#   f1_outputs.append(f1_output)
+
+# f2_designates = []
+# f2_outputs = []
+# for i in range(total_len):
+#   f2_designate, f2_output = total_output(test_src[i],test_dest[i],2,0.2)
+#   f2_designates.append(f2_designate)
+#   f2_outputs.append(f2_output)
+
+# f3_designates = []
+# f3_outputs = []
+# for i in range(total_len):
+#   f3_designate, f3_output = total_output(test_src[i],test_dest[i],3,0.2)
+#   f3_designates.append(f3_designate)
+#   f3_outputs.append(f3_output)
+
+# f4_designates = []
+# f4_outputs = []
+# for i in range(total_len):
+#   f4_designate, f4_output = total_output(test_src[i],test_dest[i],4,0.2)
+#   f4_designates.append(f4_designate)
+#   f4_outputs.append(f4_output)
+
+# result0=sim(sum(f0_designates,[]),sum(f0_outputs,[])) # +1
+# result1=sim(sum(f1_designates,[]),sum(f1_outputs,[])) # +1
+# result2=sim(sum(f2_designates,[]),sum(f2_outputs,[])) # +0.2
+# result3=sim(sum(f3_designates,[]),sum(f3_outputs,[])) # +0.2
+# result4=sim(sum(f4_designates,[]),sum(f4_outputs,[])) # +0.2
+# print(result0, result1, result2, result3, result4)

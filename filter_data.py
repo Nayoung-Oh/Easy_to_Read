@@ -38,12 +38,16 @@ wordnet_lemmatizer = WordNetLemmatizer()
 stopwords = stopwords.words('english')
 # all_words[word] = 0(not in wordfreq) or 1(in wordfreq)
 
-dest_file = "./wikilarge/wiki.full.aner.train.dst"
-src_file = "./wikilarge/wiki.full.aner.train.src"
-write_to = "./wikilarge/new_data_train.csv"
+# dest_file = "./wikilarge/wiki.full.aner.train.dst"
+dest_file = "./asset/dataset/asset.test.simp."
+# src_file = "./wikilarge/wiki.full.aner.train.src"
+src_file = "./asset/dataset/asset.test.orig"
+write_to = "./asset/dataset/data_valid.csv"
 
-with open(dest_file, 'r', encoding = 'utf-8') as f1:
-  train_dest = f1.readlines()
+train_dest = []
+for i in range(10):
+  with open(dest_file+str(i), 'r', encoding = 'utf-8') as f1:
+    train_dest.extend(f1.readlines())
 with open(src_file, 'r', encoding = 'utf-8') as f2:
   train_src = f2.readlines()
 
@@ -145,8 +149,9 @@ def make_features(src, dest):
   return [dotCount_src, restCount_src, stopCount_src, lenCount_src, easywordRatio_src, dotRatio, restRatio, stopRatio, lenRatio, easyRatio]
 
 with open(write_to, "w", encoding = 'utf-8', newline='') as writecsv:
+  for i in range(10):
     with open(src_file, encoding = 'utf-8') as oris:
-        with open(dest_file, encoding = 'utf-8') as orid:
+        with open(dest_file+str(i), encoding = 'utf-8') as orid:
             writer = csv.writer(writecsv)
             oris = oris.readlines()
             orid = orid.readlines()
