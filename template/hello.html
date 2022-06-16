@@ -1,0 +1,150 @@
+<!doctype html>
+
+<head>
+  <title>CS376</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js"></script>
+  
+
+  <script src="https://code.jquery.com/jquery-2.2.4.min.js"
+    integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script scr="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css">
+</head>
+
+<body>
+  <div class="container" style="text-align:center;padding-top:30px;padding-bottom:30px;">
+    <h1>CS376 DEMO</h1>
+
+    <!-- <form> -->
+    <div>
+      <image src="/static/akinator.png" width="250"></image>
+    </div>
+
+
+    <div class="row">
+      <div class="col-4">
+        <br>
+        <div>
+          <label id="featlab1" for="customRange1" class="form-label" data-bs-toggle="tooltip" title="Split the input into more sentences" data-placement="top">Feature 1: Dot count (1)</label>
+          <input type="range" class="form-range" id="customRange1" min="0" max="2" step="0.1">
+        </div>
+        <br>
+        <div>
+          <label id="featlab2" for="customRange2" class="form-label" data-bs-toggle="tooltip" title="Reduce the number of commas" data-placement="top">Feature 2: Rest count (1)</label>
+          <input type="range" class="form-range" id="customRange2" min="0" max="2" step="0.1">
+        </div>
+        <br>
+        <div>
+          <label id="featlab3" for="customRange3" class="form-label" data-bs-toggle="tooltip" title="Less stop words" data-placement="top">Feature 3: Stop count (1)</label>
+          <input type="range" class="form-range" id="customRange3" min="0" max="2" step="0.1">
+        </div>
+        <br>
+        <div>
+          <label id="featlab4" for="customRange4" class="form-label" data-bs-toggle="tooltip" title="Less words per sentence" data-placement="top">Feature 4: Length ratio (1)</label>
+          <input type="range" class="form-range" id="customRange4" min="0" max="2" step="0.1">
+        </div>
+        <br>
+        <div>
+          <label id="featlab5" for="customRange5" class="form-label" data-bs-toggle="tooltip" title="Use more easy words"  data-placement="top">Feature 5: Easy ratio (1)</label>
+          <input type="range" class="form-range" id="customRange5" min="0" max="2" step="0.1">
+        </div>        
+        <br>
+      </div>
+      <div class="col-8">
+        <div class="mb-2">
+          <label for="input-text" class="form-label">Input</label>
+          <textarea class="form-control" id="input-text" rows="3"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <button id="btn-submit" class="btn btn-primary mb-3">Submit</button>
+        </div>
+        <div class="mb-3">
+          <label for="output-text" class="form-label">Output</label>
+          <textarea class="form-control" id="output-text" rows="3"></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="output-text-baseline" class="form-label">Output (Baseline)</label>
+          <textarea class="form-control" id="output-text-baseline" rows="3"></textarea>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <!-- </form> -->
+
+  <script>
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    $(document).ready(function () {
+      $('#featlab1').html('Feature 1: Dot count (1)')
+      $('#featlab2').html('Feature 2: Rest count (1)')
+      $('#featlab3').html('Feature 3: Stop count (1)')
+      $('#featlab4').html('Feature 4: Length ratio (1)')
+      $('#featlab5').html('Feature 5: Easy ratio (1)')
+
+      $('#customRange1').on('change', function () {
+        $('#featlab1').html('Feature 1: Dot count (' + $(this).val() + ')')
+      })
+      $('#customRange2').on('change', function () {
+        $('#featlab2').html('Feature 2: Rest count (' + $(this).val() + ')')
+      })
+      $('#customRange3').on('change', function () {
+        $('#featlab3').html('Feature 3: Stop count (' + $(this).val() + ')')
+      })
+      $('#customRange4').on('change', function () {
+        $('#featlab4').html('Feature 4: Length ratio (' + $(this).val() + ')')
+      })
+      $('#customRange5').on('change', function () {
+        $('#featlab5').html('Feature 5: Easy ratio (' + $(this).val() + ')')
+      })
+
+      $('#btn-submit').on('click', function () {
+        $('#output-text').val('');
+
+        val1 = $('#customRange1').val();
+        val2 = $('#customRange2').val();
+        val3 = $('#customRange3').val();
+        val4 = $('#customRange4').val();
+        val5 = $('#customRange5').val();
+        text = $('#input-text').val();
+
+        json_data = {
+          'feat1': val1,
+          'feat2': val2,
+          'feat3': val3,
+          'feat4': val4,
+          'feat5': val5,
+          'text': text
+        }
+        console.log(json_data);
+
+        $.ajax({
+          type: "POST",
+          url: '/api/askmodel',
+          data: JSON.stringify(json_data),
+          success: function(data){
+            $('#output-text').val(data['output']);
+            $('#output-text-baseline').val(data['output-baseline']);
+          },
+          error: function(data){
+            $('#output-text').val("ERROR!!!");
+            $('#output-text-baseline').val("ERROR!!!");
+
+          },
+          accept: "application/json",
+          contentType: "application/json; charset=utf-8",
+          dataType: "json",
+        });
+      })
+    });
+  </script>
+</body>
