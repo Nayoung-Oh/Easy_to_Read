@@ -42,16 +42,23 @@ special_symbols = ['<unk>', '<pad>', '<bos>', '<eos>']
 # Create torchtext's Vocab object 
 file_paths = ["./wikilarge/wiki.full.aner.train.src", "./wikilarge/wiki.full.aner.train.dst"]
 # file_paths = ["./wikismall/PWKP_108016.tag.new.aner.train.src", "./wikismall/PWKP_108016.tag.new.aner.train.dst"]
-for f in file_paths:
-  vocab_transform.append(build_vocab_from_iterator(yield_tokens_from_file(f),
-                                                min_freq=3,
-                                                specials=special_symbols,
-                                                special_first=True))
+# for f in file_paths:
+#   vocab_transform.append(build_vocab_from_iterator(yield_tokens_from_file(f),
+#                                                 min_freq=3,
+#                                                 specials=special_symbols,
+#                                                 special_first=True))
 
 # Set UNK_IDX as the default index. This index is returned when the token is not found. 
-# If not set, it throws RuntimeError when the queried token is not found in the Vocabulary. 
+# If not set, it throws RuntimeError when the queried token is not found in the Vocabulary.
+
+for i in range(2):
+  vocab_transform.append(torch.load("vocab_"+str(i)+".pth"))
+
 for i in range(2):
   vocab_transform[i].set_default_index(UNK_IDX)
+
+
+
 
 stopwords = stopwords.words('english')
 stop_idx = [a for a in vocab_transform[1](stopwords) if a != 0]
@@ -152,7 +159,7 @@ def create_mask(src, tgt):
     tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
     return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
 
-# sumwriter = SummaryWriter("./logs/feature_big")
+# sumwriter = SummaryWriter("./logs/baseline")
 
 def feature_cal(tmp, info, cl):
   next_word = np.max(tmp, axis=2)
@@ -349,20 +356,20 @@ NUM_EPOCHS = 3
 # Rice is also known for his charity work
 # tgt: Rice is also known for his charity work . 
 
-transformer.load_state_dict(torch.load("new_large_5_val_1.045"))
+transformer.load_state_dict(torch.load("new_large_6_val_1.046"))
 
 # transformer.load_state_dict(torch.load("large_3_val_2.338"))
 # print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[0, 0, 0, 0, 0]], dtype=torch.float)))
 # print(simplify(transformer, "The incident has been the subject of numerous reports as to ethics in scholarship .", torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0]], dtype=torch.float)))
-# print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,1.0,1.0]], dtype=torch.float)))
-# print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,0.8,1.0]], dtype=torch.float)))
-# print(simplify(transformer, "I really really love you more than anyone .", torch.tensor([[1.0,1.0,1.0,1.2,1.0]], dtype=torch.float)))
+print(simplify(transformer, "The vehicle on sale is too expensive to buy .", torch.tensor([[1.0,1.0,1.0,1.0,1.0]], dtype=torch.float)))
+print(simplify(transformer, "The vehicle on sale is too expensive to buy .", torch.tensor([[1.0,1.0,1.0,1.0,1.2]], dtype=torch.float)))
+print(simplify(transformer, "The vehicle on sale is too expensive to buy .", torch.tensor([[1.0,1.0,1.0,1.0,0.8]], dtype=torch.float)))
 
 
 # The incident has been the subject of numerous reports regarding scholarship ethics .
 
 # with open("./wikilarge/new_data_test.csv", encoding = 'utf-8') as f:
-#     with open("./wikilarge/new_report.txt", "w", encoding='utf-8') as res:
+#     with open("./wikilarge/new_new_report.txt", "w", encoding='utf-8') as res:
 #         reader = csv.reader(f)
 #         for l in reader:
 #             res.write(simplify(transformer, l[-2], torch.tensor([[float(i) for i in l[5:10]]])) + '\n')
