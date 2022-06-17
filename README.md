@@ -34,7 +34,7 @@ ex) with wikilarge dataset, with weighted loss
 
 ex) with wikilarge dataset, with weighted loss
 
-<code> python train.py --data wikilarge --model feature --loss weighted --path PATH</code>
+<code> python test.py --data wikilarge --model feature --loss weighted --path PATH</code>
 
 if you want to check the output of a specific sentence, use `simplify` function
 
