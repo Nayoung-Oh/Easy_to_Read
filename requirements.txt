@@ -1,0 +1,11 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: win-64
+easse=0.2.4
+en-core-web-sm=3.0.0
+numpy=1.21.5
+spacy=3.0.8
+tensorboard=2.9.0
+tokenizers=0.12.1
+torch=1.11.0
+torchtext=0.11.1
