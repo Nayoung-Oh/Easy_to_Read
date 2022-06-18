@@ -1,7 +1,7 @@
 '''
 @ Contributor: Nayoung-Oh
 
-Some parts are referred to https://pytorch.org/tutorials/beginner/translation_transformer.html
+Some parts related to baseline transformer are referred to https://pytorch.org/tutorials/beginner/translation_transformer.html
 '''
 
 from torch.utils.data import DataLoader
@@ -92,8 +92,8 @@ class Trainer():
         self.optimizer = torch.optim.Adam(transformer.parameters(), lr=0.0002, betas=(0.9, 0.98), eps=1e-9)
 
         self.__generte_text_transform()
+        self.sumwriter = None
 
-        self.sumwriter = SummaryWriter("./logs")
 
     def __generte_text_transform(self):
         # helper function to club together sequential operations
@@ -238,6 +238,8 @@ class Trainer():
                 end_time = timer()
                 print(i, '/', max_len, end_time - start_time)
                 start_time = timer()
+                if self.sumwriter == None:
+                    self.sumwriter = SummaryWriter("./logs/"+self.model+"_"+self.loss)
                 self.sumwriter.add_scalar('training_loss', tmp, (epoch-1)*max_len + i)
             
             losses += tmp
@@ -308,7 +310,10 @@ class Trainer():
         cl = cl.to(self.DEVICE)
         src_mask = src_mask.to(self.DEVICE)
 
-        memory = self.transformer.encode(src, src_mask, cl)
+        if self.model == "feature":
+            memory = self.transformer.encode(src, src_mask, cl)
+        else:
+            memory = self.transformer.encode(src, src_mask)
         ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(self.DEVICE)
         for i in range(max_len-1):
             memory = memory.to(self.DEVICE)
@@ -330,7 +335,10 @@ class Trainer():
         self.transformer.eval()
         src = self.text_transform[0](src_sentence).view(-1, 1)
         num_tokens = src.shape[0]
-        src_mask = (torch.zeros(num_tokens + 1, num_tokens + 1)).type(torch.bool)
+        if self.model == "feature":
+            src_mask = (torch.zeros(num_tokens + 1, num_tokens + 1)).type(torch.bool)
+        else:
+            src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
         tgt_tokens = self.__greedy_decode(
             src, src_mask, max_len=num_tokens + 5, start_symbol=self.BOS_IDX, cl=cl).flatten()
         return " ".join(self.vocab_transform[1].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")

@@ -1,7 +1,7 @@
 '''
 @ Contributor: Nayoung-Oh
 
-Some parts are referred to https://pytorch.org/tutorials/beginner/translation_transformer.html
+Some parts related to baseline transformer are referred to https://pytorch.org/tutorials/beginner/translation_transformer.html
 '''
 from torch import Tensor
 import torch

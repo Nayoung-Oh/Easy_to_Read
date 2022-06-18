@@ -1,7 +1,6 @@
 '''
 @ Contributor: Nayoung-Oh
 
-Some parts are referred to https://pytorch.org/tutorials/beginner/translation_transformer.html
 '''
 
 import argparse
@@ -23,8 +22,8 @@ if __name__ == '__main__':
     trainer = Trainer(variant["data"], variant["model"], variant["loss"])
 
     NUM_EPOCHS = variant["epoch"]
-    
-    min_val_loss = 3
+    trainer.transformer.load_state_dict(torch.load("log_1_val_1.328.pth"))
+    min_val_loss = 10
     for epoch in range(1, NUM_EPOCHS+1):
         train_loss = trainer.train_epoch(epoch)
         val_loss = trainer.evaluate(epoch)

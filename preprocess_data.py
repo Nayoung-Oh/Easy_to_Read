@@ -40,7 +40,8 @@ class DataProcessor():
     self.write_to = self.write_to.replace(self.type, to_type)
     self.type = to_type
 
-  def __generate_data(self):
+  def generate_data(self):
+    
     with open(self.dest_file, 'r', encoding = 'utf-8') as f1:
       train_dest = f1.readlines()
     with open(self.src_file, 'r', encoding = 'utf-8') as f2:
@@ -67,7 +68,6 @@ class DataProcessor():
     for sent in prepro2_dest:
       preprocess_freqword(sent)
     for sent in prepro2_src:
-      # print(sent)
       preprocess_freqword(sent)
     for word in self.word_freq[1:easyNum]:
       self.all_words[word] = 1
@@ -75,7 +75,7 @@ class DataProcessor():
   def __count_freqword(self, sent):
     res = 0
     for word in sent:
-      if self.all_words[word] == 1:
+      if self.all_words.get(word, 0) == 1:
         res = res + 1
     return res
 
@@ -168,7 +168,7 @@ class DataProcessor():
     files = ["train", "valid", "test"]
 
     for i in range(len(files)):
-      self.__generate_data()
+      self.generate_data()
 
       with open(self.write_to, "w", encoding = 'utf-8', newline='') as writecsv:
         with open(self.src_file, encoding = 'utf-8') as oris:
