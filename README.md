@@ -1,6 +1,6 @@
 # Easy-to-Read Sentence Generation for the Intellectual Disability
 
-CS376 Team 4 Code Repository
+CS376 Team 4 Code Repository ([GITHUB](https://github.com/Nayoung-Oh/Easy_to_Read))
 
 ## Prepare wikilarge or wikismall dataset
 
